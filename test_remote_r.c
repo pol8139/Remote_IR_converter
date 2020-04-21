@@ -1,8 +1,8 @@
 //                  +-\/-+
 //    (reset) PB5  1|    |8  Vcc
 //  LED debug PB3  2|    |7  PB2
-// UART 38400 PB4  3|    |6  PB1 (OCB1) IR out
-//            GND  4|    |5  PB0 IR in
+// UART 38400 PB4  3|    |6  PB1 (OCB1)  IR out
+//            GND  4|    |5  PB0 (PCINT0)IR in
 //                  +----+
 
 #ifndef __AVR_ATtiny13A__
@@ -26,9 +26,22 @@
 
 volatile unsigned int time_micros = 0;
 
+void initTimer(void);
+void initIRIn(void);
+unsigned int myMicros(void);
+unsigned long readIR(void);
+
 ISR(TIM0_OVF_vect) // interrupts every 26.3us(38kHz)
 {
     time_micros += 26;
+}
+
+ISR(PCINT0_vect)
+{
+    cbi(PCMSK, PCINT0);
+    sei(); // 多重割り込みをピン変化以外許可
+    readIR();
+    initIRIn();
 }
 
 void initTimer(void)
@@ -38,8 +51,13 @@ void initTimer(void)
 	//TCNT0 = 0;
 	OCR0A = 32; // PWM interval 560uS
 	OCR0B = 21; // Duty 1/3 (clear=21 clocks, set=32-21=11 clocks)
-	//GIMSK  = _BV(INT0) | _BV(PCIE); // External Interrupt Request 0 Enable, Pin Change Interrupt Enable
 	TIMSK0 = /*_BV(OCIE0B) | */_BV(TOIE0); // Counter Overflow Interrupt Enable
+}
+
+void initIRIn(void)
+{
+    GIMSK = _BV(PCIE); // Pin Change Interrupt Enable
+    PCMSK = _BV(PCINT0); //Pin 0 Change Enable
 }
 
 // void send(char c)
@@ -55,8 +73,8 @@ unsigned int myMicros(void)
 unsigned long readIR(void)
 {
     unsigned int time;
-    loop_until_bit_is_set(PINB, IRIN); // wait until the code starts -- the output of IR receiver rodules is active low
-    loop_until_bit_is_clear(PINB, IRIN);
+    //loop_until_bit_is_set(PINB, IRIN); // wait until the code starts -- the output of IR receiver rodules is active low
+    //loop_until_bit_is_clear(PINB, IRIN);
     time = myMicros();
     loop_until_bit_is_set(PINB, IRIN);
     if((myMicros() - time) < 7200){
@@ -80,6 +98,7 @@ int main(void)
     unsigned t = 0;
     DDRB |= _BV(DDB3);
     initTimer();
+    initIRIn();
     // xdev_out(send);
     sei();
     while(1) {
@@ -94,8 +113,9 @@ int main(void)
         // } else {
         //     cbi(PORTB, PB3);
         // }
-        readIR();
 
+        // readIR();
+        ;
         // xitoa(diff, 10, 0);
         // TxByte('\t');
         // xitoa(time, 10, 0);
