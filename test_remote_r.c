@@ -24,16 +24,16 @@
 #include "BasicSerial3.h"
 // #include "xitoa.h"
 
-volatile unsigned int time_micros = 0;
+volatile unsigned int time_26micros = 0;
 
 void initTimer(void);
 void initIRIn(void);
-unsigned int myMicros(void);
+unsigned char my26Micros(void);
 unsigned long readIR(void);
 
 ISR(TIM0_OVF_vect) // interrupts every 26.3us(38kHz)
 {
-    time_micros += 26;
+    time_26micros++;
 }
 
 ISR(PCINT0_vect)
@@ -65,16 +65,16 @@ void initIRIn(void)
 //     TxByte(c);
 // }
 
-unsigned int myMicros(void)
+unsigned char my26Micros(void)
 {
-    return time_micros;
+    return time_26micros;
 }
 
 unsigned long readIR(void)
 {
     //loop_until_bit_is_set(PINB, IRIN); // wait until the code starts -- the output of IR receiver rodules is active low
     //loop_until_bit_is_clear(PINB, IRIN);
-    unsigned int time/* = myMicros(), elapsed*/;
+    unsigned char time/* = myMicros(), elapsed*/;
     unsigned long code = 0;
     loop_until_bit_is_set(PINB, IRIN);
     // elapsed = myMicros() - time;
@@ -89,21 +89,22 @@ unsigned long readIR(void)
     // }
     for(char i = 0; i < 32; i++) {
         loop_until_bit_is_set(PINB, IRIN);
-        time = myMicros();
+        time = my26Micros();
         loop_until_bit_is_clear(PINB, IRIN);
-        //elapsed = myMicros() - time;
-        if(myMicros() - time > 1000) {
+        time = my26Micros() - time;
+        if(time > 40) {
             // code |= 1 << ((3 - (i / 8)) * 8 + i % 8);
             code |= 1 << (31 - i);
         }
     }
-    sbi(PORTB, LED);
-    _delay_ms(500);
-    cbi(PORTB, LED);
-    for(char i = 0; i < 4; i++) {
-        TxByte((code >> (8 * (3 - i))) & 0xFF);
-    }
-    return 0;
+    // sbi(PORTB, LED);
+    // _delay_ms(500);
+    // cbi(PORTB, LED);
+    // TxByte(code >> 24);
+    // TxByte(code >> 16);
+    // TxByte(code >> 8);
+    // TxByte(code);
+    return code;
 }
 
 int main(void)
