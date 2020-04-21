@@ -21,7 +21,7 @@
 #include <avr/interrupt.h>
 // #include <stdio.h>
 #include <util/delay.h>
-// #include "BasicSerial3.h"
+#include "BasicSerial3.h"
 // #include "xitoa.h"
 
 volatile unsigned int time_micros = 0;
@@ -72,31 +72,48 @@ unsigned int myMicros(void)
 
 unsigned long readIR(void)
 {
-    unsigned int time;
     //loop_until_bit_is_set(PINB, IRIN); // wait until the code starts -- the output of IR receiver rodules is active low
     //loop_until_bit_is_clear(PINB, IRIN);
-    time = myMicros();
+    unsigned int time/* = myMicros(), elapsed*/;
+    unsigned long code = 0;
     loop_until_bit_is_set(PINB, IRIN);
-    if((myMicros() - time) < 7200){
-        return READ_FAILED;
-    }
-    time = myMicros();
+    // elapsed = myMicros() - time;
+    // if(elapsed < 7200 || 10800 < elapsed){
+    //     return READ_FAILED;
+    // }
+    // time = myMicros();
     loop_until_bit_is_clear(PINB, IRIN);
-    if((myMicros() - time) < 3600){
-        return READ_FAILED;
+    // elapsed = myMicros() - time;
+    // if(elapsed < 3600 || 5400 < elapsed){
+    //     return READ_FAILED;
+    // }
+    for(char i = 0; i < 32; i++) {
+        loop_until_bit_is_set(PINB, IRIN);
+        time = myMicros();
+        loop_until_bit_is_clear(PINB, IRIN);
+        //elapsed = myMicros() - time;
+        if(myMicros() - time > 1000) {
+            // code |= 1 << ((3 - (i / 8)) * 8 + i % 8);
+            code |= 1 << (31 - i);
+        }
     }
     sbi(PORTB, LED);
     _delay_ms(500);
     cbi(PORTB, LED);
+    for(char i = 0; i < 4; i++) {
+        TxByte((code >> (8 * (3 - i))) & 0xFF);
+    }
     return 0;
 }
 
 int main(void)
 {
     // unsigned char t = 0;
-    unsigned int time, diff;
-    unsigned t = 0;
+    // unsigned int time, diff;
+    // unsigned char t = 0;
+
     DDRB |= _BV(DDB3);
+
     initTimer();
     initIRIn();
     // xdev_out(send);
