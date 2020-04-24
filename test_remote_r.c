@@ -20,7 +20,6 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-// #include <stdio.h>
 #include <util/delay.h>
 // #include "BasicSerial3.h"
 // #include "xitoa.h"
@@ -30,6 +29,7 @@ volatile unsigned int time_26micros = 0;
 void initTimer(void);
 void initIRIn(void);
 unsigned char my26Micros(void);
+void delay26nMicros(unsigned char);
 void delay4500us(void);
 unsigned long readIR(void);
 void enablePWM(void);
@@ -38,7 +38,7 @@ void sendLeader(void);
 void sendIR1Bit(unsigned char);
 void sendIR(unsigned long);
 
-ISR(TIM0_OVF_vect) // interrupts every 26.3us(38kHz)
+ISR(TIM0_OVF_vect) // Interrupts every 26.3us(38kHz)
 {
     time_26micros++;
 }
@@ -46,25 +46,24 @@ ISR(TIM0_OVF_vect) // interrupts every 26.3us(38kHz)
 ISR(PCINT0_vect)
 {
     cbi(PCMSK, PCINT0);
-    sei(); // 多重割り込みをピン変化以外許可
+    sei(); // Multiple Interrupt Enable except Pin Change Interrupt
     readIR();
     initIRIn();
 }
 
 void initTimer(void)
 {
-    TCCR0A = _BV(COM0B1) | _BV(COM0B0) | _BV(WGM01) | _BV(WGM00); // Set OC0B at Compare Match (=OCR0B) and clear at TOP
-	TCCR0B = _BV(WGM02) | _BV(CS01); // Prescale 1/8, Fast PWM with TOP = OCR0A
-	//TCNT0 = 0;
+    TCCR0A = _BV(COM0B1) | _BV(COM0B0) | _BV(WGM01) | _BV(WGM00); // Compare Match B Output, Fast PWM
+	TCCR0B = _BV(WGM02) | _BV(CS01); // Prescale 1/8
 	OCR0A = 29; // 38kHz
 	OCR0B = 20; // Duty 1/3
-	TIMSK0 = /*_BV(OCIE0B) | */_BV(TOIE0); // Counter Overflow Interrupt Enable
+	TIMSK0 = _BV(TOIE0); // Counter Overflow Interrupt Enable
 }
 
 void initIRIn(void)
 {
     GIMSK = _BV(PCIE); // Pin Change Interrupt Enable
-    PCMSK = _BV(PCINT0); //Pin 0 Change Enable
+    PCMSK = _BV(PCINT0); // Pin 0 Change Enable
 }
 
 // void send(char c)
@@ -77,36 +76,36 @@ unsigned char my26Micros(void)
     return time_26micros;
 }
 
-void delay4500us(void)
+void delay26nMicros(unsigned char duration)
 {
     unsigned char time = my26Micros();
-    while((unsigned char)(my26Micros() - time) < 173);
+    while((unsigned char)(my26Micros() - time) < duration);
+}
+
+void delay4500us(void)
+{
+    delay26nMicros(173);
 }
 
 unsigned long readIR(void)
 {
-    //loop_until_bit_is_set(PINB, IRIN); // wait until the code starts -- the output of IR receiver rodules is active low
+    //loop_until_bit_is_set(PINB, IRIN); // Wait until the code starts -- the output of IR receiver rodules is active low
     //loop_until_bit_is_clear(PINB, IRIN);
-    unsigned char time/* = myMicros(), elapsed*/;
+    unsigned char time;
     unsigned long code = 0;
     loop_until_bit_is_set(PINB, IRIN);
-    // elapsed = myMicros() - time;
-    // if(elapsed < 7200 || 10800 < elapsed){
-    //     return READ_FAILED;
-    // }
-    // time = myMicros();
+    time = my26Micros();
     loop_until_bit_is_clear(PINB, IRIN);
-    // elapsed = myMicros() - time;
-    // if(elapsed < 3600 || 5400 < elapsed){
-    //     return READ_FAILED;
-    // }
+    time = my26Micros() - time;
+    if(time < 156 || 190 < time){ // Elapsed time should be 4500us
+        return READ_FAILED;
+    }
     for(char i = 31; i >= 0; i--) {
         loop_until_bit_is_set(PINB, IRIN);
         time = my26Micros();
         loop_until_bit_is_clear(PINB, IRIN);
         time = my26Micros() - time;
         if(time > 40) {
-            // code |= 1 << ((3 - (i / 8)) * 8 + i % 8);
             code |= 1 << i;
         }
     }
@@ -118,7 +117,7 @@ unsigned long readIR(void)
     // TxByte(code >> 16);
     // TxByte(code >> 8);
     // TxByte(code);
-    sendIR(0x4BB6C13E);
+    sendIR(0x4BB6C03F);
     return code;
 }
 
@@ -144,18 +143,16 @@ void sendLeader(void)
 
 void sendIR1Bit(unsigned char data)
 {
-    unsigned char time, off_time;
+    unsigned char off_time;
     if(data) {
-        off_time = 63;
+        off_time = 63; // 1686us
     } else {
-        off_time = 21;
+        off_time = 21; // 562us
     }
     enablePWM();
-    time = my26Micros();
-    while((unsigned char)(my26Micros() - time) < 21);
+    delay26nMicros(21);
     disablePWM();
-    time = my26Micros();
-    while((unsigned char)(my26Micros() - time) < off_time);
+    delay26nMicros(off_time);
 }
 
 void sendIR(unsigned long data)
@@ -169,38 +166,14 @@ void sendIR(unsigned long data)
 
 int main(void)
 {
-    // unsigned char t = 0;
-    // unsigned int time, diff;
-    // unsigned char t = 0;
-
     DDRB = _BV(LED) | _BV(IROUT);
-
     initTimer();
     initIRIn();
     // xdev_out(send);
     disablePWM();
     sei();
     while(1) {
-        // time = myMicros();
-        // diff = 0;
-        // while(diff < 50000) {
-        //     diff = myMicros() - time;
-        // }
-        // t ^= 1;
-        // if(t) {
-        //     sbi(PORTB, PB3);
-        // } else {
-        //     cbi(PORTB, PB3);
-        // }
-
         // readIR();
         ;
-        // xitoa(diff, 10, 0);
-        // TxByte('\t');
-        // xitoa(time, 10, 0);
-        // TxByte('\r');
-        // TxByte('\n');
-        // serOut("hogehoge\n\r");
-        // _delay_ms(500);
     }
 }
