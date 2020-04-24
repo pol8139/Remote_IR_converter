@@ -9,8 +9,9 @@
 #define __AVR_ATtiny13A__
 #endif // not needed when compile but needed when auto-complete of VSCode
 
-#define LED 3
 #define IRIN 0
+#define IROUT 1
+#define LED 3
 
 #define READ_FAILED 0xFFFF
 
@@ -21,7 +22,7 @@
 #include <avr/interrupt.h>
 // #include <stdio.h>
 #include <util/delay.h>
-#include "BasicSerial3.h"
+// #include "BasicSerial3.h"
 // #include "xitoa.h"
 
 volatile unsigned int time_26micros = 0;
@@ -29,7 +30,13 @@ volatile unsigned int time_26micros = 0;
 void initTimer(void);
 void initIRIn(void);
 unsigned char my26Micros(void);
+void delay4500us(void);
 unsigned long readIR(void);
+void enablePWM(void);
+void disablePWM(void);
+void sendLeader(void);
+void sendIR1Bit(unsigned char);
+void sendIR(unsigned long);
 
 ISR(TIM0_OVF_vect) // interrupts every 26.3us(38kHz)
 {
@@ -49,8 +56,8 @@ void initTimer(void)
     TCCR0A = _BV(COM0B1) | _BV(COM0B0) | _BV(WGM01) | _BV(WGM00); // Set OC0B at Compare Match (=OCR0B) and clear at TOP
 	TCCR0B = _BV(WGM02) | _BV(CS01); // Prescale 1/8, Fast PWM with TOP = OCR0A
 	//TCNT0 = 0;
-	OCR0A = 32; // PWM interval 560uS
-	OCR0B = 21; // Duty 1/3 (clear=21 clocks, set=32-21=11 clocks)
+	OCR0A = 29; // 38kHz
+	OCR0B = 20; // Duty 1/3
 	TIMSK0 = /*_BV(OCIE0B) | */_BV(TOIE0); // Counter Overflow Interrupt Enable
 }
 
@@ -70,6 +77,12 @@ unsigned char my26Micros(void)
     return time_26micros;
 }
 
+void delay4500us(void)
+{
+    unsigned char time = my26Micros();
+    while((unsigned char)(my26Micros() - time) < 173);
+}
+
 unsigned long readIR(void)
 {
     //loop_until_bit_is_set(PINB, IRIN); // wait until the code starts -- the output of IR receiver rodules is active low
@@ -87,24 +100,71 @@ unsigned long readIR(void)
     // if(elapsed < 3600 || 5400 < elapsed){
     //     return READ_FAILED;
     // }
-    for(char i = 0; i < 32; i++) {
+    for(char i = 31; i >= 0; i--) {
         loop_until_bit_is_set(PINB, IRIN);
         time = my26Micros();
         loop_until_bit_is_clear(PINB, IRIN);
         time = my26Micros() - time;
         if(time > 40) {
             // code |= 1 << ((3 - (i / 8)) * 8 + i % 8);
-            code |= 1 << (31 - i);
+            code |= 1 << i;
         }
     }
-    // sbi(PORTB, LED);
-    // _delay_ms(500);
-    // cbi(PORTB, LED);
+    sbi(PORTB, LED);
+    _delay_ms(250);
+    cbi(PORTB, LED);
+    _delay_ms(250);
     // TxByte(code >> 24);
     // TxByte(code >> 16);
     // TxByte(code >> 8);
     // TxByte(code);
+    sendIR(0x4BB6C13E);
     return code;
+}
+
+void enablePWM(void)
+{
+    TCCR0A |= _BV(COM0B1) | _BV(COM0B0);
+}
+
+void disablePWM(void)
+{
+    TCCR0A &= ~(_BV(COM0B1) | _BV(COM0B0));
+    cbi(PORTB, IROUT);
+}
+
+void sendLeader(void)
+{
+    enablePWM();
+    delay4500us();
+    delay4500us();
+    disablePWM();
+    delay4500us();
+}
+
+void sendIR1Bit(unsigned char data)
+{
+    unsigned char time, off_time;
+    if(data) {
+        off_time = 63;
+    } else {
+        off_time = 21;
+    }
+    enablePWM();
+    time = my26Micros();
+    while((unsigned char)(my26Micros() - time) < 21);
+    disablePWM();
+    time = my26Micros();
+    while((unsigned char)(my26Micros() - time) < off_time);
+}
+
+void sendIR(unsigned long data)
+{
+    sendLeader();
+    for(char i = 31; i >= 0; i--) {
+        sendIR1Bit((data >> i) & 0x01);
+    }
+    sendIR1Bit(0); // stop bit
 }
 
 int main(void)
@@ -113,11 +173,12 @@ int main(void)
     // unsigned int time, diff;
     // unsigned char t = 0;
 
-    DDRB |= _BV(DDB3);
+    DDRB = _BV(LED) | _BV(IROUT);
 
     initTimer();
     initIRIn();
     // xdev_out(send);
+    disablePWM();
     sei();
     while(1) {
         // time = myMicros();
