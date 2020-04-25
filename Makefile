@@ -19,7 +19,7 @@ $(HEX): $(ELF)
 	$(SIZE) --mcu=$(MCU) --format=avr $(ELF)
 
 $(ELF): $(OBJS)
-	$(CC) $(CFLAGS) -o $(ELF)   BasicSerial3.S $^
+	$(CC) $(CFLAGS) -o $(ELF) $^
 
 clean:
 	-$(RM) $(ELF) $(HEX) $(OBJS)

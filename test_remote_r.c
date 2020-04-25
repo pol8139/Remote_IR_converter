@@ -28,7 +28,7 @@
 
 //                                                       PLAY                      |<<                       >>|
 PROGMEM const unsigned char ir_recieve[NUM_CODES][4] = {{0x4B, 0x98, 0x3A, 0xC5}, {0x4B, 0x40, 0x09, 0xF6}, {0x4B, 0x40, 0xF1, 0x0E}};
-PROGMEM const unsigned long ir_send[NUM_CODES]       =  {0x9E6140BF,               0x9E6120DF,               0x9E61E01F};
+PROGMEM const unsigned char ir_send[NUM_CODES][4]    = {{0x9E, 0x61, 0x40, 0xBF}, {0x9E, 0x61, 0x20, 0xDF}, {0x9E, 0x61, 0xE0, 0x1F}};
 
 volatile unsigned char time_26micros = 0;
 volatile unsigned char code_vol[4] = {};
@@ -43,7 +43,7 @@ void enablePWM(void);
 void disablePWM(void);
 void sendLeader(void);
 void sendIR1Bit(unsigned char);
-void sendIR(unsigned long);
+void sendIR(unsigned char *);
 
 ISR(TIM0_OVF_vect) // Interrupts every 26.3us(38kHz)
 {
@@ -66,8 +66,8 @@ ISR(PCINT0_vect)
                 if(code_vol[j] != pgm_read_byte(&(ir_recieve[i][j]))) {
                     break;
                 }
-                if(j == NUM_CODES) {
-                    sendIR(pgm_read_dword(&(ir_send[i])));
+                if(j == 3) {
+                    sendIR(ir_send[i]);
                 }
             }
         }
@@ -120,7 +120,7 @@ unsigned char readIR(void)
     unsigned char time = my26Micros();
     loop_until_bit_is_clear(PINB, IRIN);
     time = my26Micros() - time;
-    if(time < 156 || 190 < time){ // Elapsed time should be 4500us
+    if(time < 156 || 190 < time){ // Elapsed time should be around 4500us
         return 1;
     }
     for(char i = 0; i < 4; i++) {
@@ -175,11 +175,15 @@ void sendIR1Bit(unsigned char data)
     delay26nMicros(off_time);
 }
 
-void sendIR(unsigned long data)
+void sendIR(unsigned char *data)
 {
+    unsigned char code_byte = 0;
     sendLeader();
-    for(char i = 31; i >= 0; i--) {
-        sendIR1Bit((data >> i) & 0x01);
+    for(char i = 0; i < 4; i++) {
+        code_byte = pgm_read_byte(&(data[i]));
+        for(char j = 7; j >= 0; j--) {
+            sendIR1Bit((code_byte >> j) & 0x01);
+        }
     }
     sendIR1Bit(0); // stop bit
 }
