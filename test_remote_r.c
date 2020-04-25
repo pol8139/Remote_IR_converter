@@ -13,9 +13,9 @@
 #define IROUT 1
 #define LED 3
 
-#define NUM_CODES 3
+#define NUM_CODES 12
 
-#define F_CPU 9600000UL
+// #define F_CPU 9600000UL
 
 #define sbi(PORT, BIT) PORT |= _BV(BIT)
 #define cbi(PORT, BIT) PORT &= ~_BV(BIT)
@@ -26,9 +26,36 @@
 // #include "BasicSerial3.h"
 // #include "xitoa.h"
 
-//                                                       PLAY                      |<<                       >>|
-PROGMEM const unsigned char ir_recieve[NUM_CODES][4] = {{0x4B, 0x98, 0x3A, 0xC5}, {0x4B, 0x40, 0x09, 0xF6}, {0x4B, 0x40, 0xF1, 0x0E}};
-PROGMEM const unsigned char ir_send[NUM_CODES][4]    = {{0x9E, 0x61, 0x40, 0xBF}, {0x9E, 0x61, 0x20, 0xDF}, {0x9E, 0x61, 0xE0, 0x1F}};
+PROGMEM const unsigned char ir_recieve[NUM_CODES][4] = 
+{
+    {0x4B, 0xB6, 0x21, 0xDE}, // RC-934R LEFT
+    {0x4B, 0xB6, 0xA1, 0x5E}, // RC-934R RIGHT
+    {0x4B, 0xB6, 0xE9, 0x16}, // RC-934R ENTER
+    {0x4B, 0x98, 0x3A, 0xC5}, // RC-934R PLAY/PAUSE
+    {0x4B, 0x40, 0x09, 0xF6}, // RC-934R |<<
+    {0x4B, 0x40, 0xF1, 0x0E}, // RC-934R >>|
+    {0x4B, 0x98, 0xFA, 0x05}, // RC-934R REPEAT
+    {0x4B, 0x40, 0xCB, 0x34}, // RC-934R MODE
+    {0x02, 0xFD, 0x48, 0xB7}, // SE-R0473 TV電源
+    {0x02, 0xFD, 0xF0, 0x0F}, // SE-R0473 TV/入力切替
+    {0x02, 0xFD, 0x58, 0xA7}, // SE-R0473 TV音量↑
+    {0x02, 0xFD, 0x78, 0x87}, // SE-R0473 TV音量↓
+};
+PROGMEM const unsigned char ir_send[NUM_CODES][4] = 
+{
+    {0xA2, 0xED, 0xF8, 0x07}, // SE-R0473 チャンネル↓
+    {0xA2, 0xED, 0x78, 0x87}, // SE-R0473 チャンネル↑
+    {0x9E, 0x61, 0x80, 0x7F}, // RS-CD6T OPEN/CLOSE
+    {0x9E, 0x61, 0xAA, 0x55}, // RS-CD6T PAUSE
+    {0x9E, 0x61, 0x20, 0xDF}, // RS-CD6T |<<
+    {0x9E, 0x61, 0xE0, 0x1F}, // RS-CD6T >>|
+    {0x9E, 0x61, 0x10, 0xEF}, // RS-CD6T S/F/OFF
+    {0x9E, 0x61, 0x50, 0xAF}, // RS-CD6T TIME DISPLAY
+    {0x4B, 0x36, 0xD3, 0x2C}, // RC-934R POWER
+    {0x4B, 0xB6, 0x70, 0x8F}, // RC-934R CBL/SAT
+    {0x4B, 0xB6, 0x40, 0xBF}, // RC-934R VOL +
+    {0x4B, 0xB6, 0xC0, 0x3F}, // RC-934R VOL -
+};
 
 volatile unsigned char time_26micros = 0;
 volatile unsigned char code_vol[4] = {};
@@ -43,7 +70,7 @@ void enablePWM(void);
 void disablePWM(void);
 void sendLeader(void);
 void sendIR1Bit(unsigned char);
-void sendIR(unsigned char *);
+void sendIR(const unsigned char *);
 
 ISR(TIM0_OVF_vect) // Interrupts every 26.3us(38kHz)
 {
@@ -175,7 +202,7 @@ void sendIR1Bit(unsigned char data)
     delay26nMicros(off_time);
 }
 
-void sendIR(unsigned char *data)
+void sendIR(const unsigned char *data)
 {
     unsigned char code_byte = 0;
     sendLeader();
