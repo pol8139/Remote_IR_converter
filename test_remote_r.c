@@ -41,6 +41,7 @@ PROGMEM const unsigned char ir_recieve[NUM_CODES][4] =
     {0x02, 0xFD, 0x58, 0xA7}, // SE-R0473 TV音量↑
     {0x02, 0xFD, 0x78, 0x87}, // SE-R0473 TV音量↓
 };
+
 PROGMEM const unsigned char ir_send[NUM_CODES][4] = 
 {
     {0xA2, 0xED, 0xF8, 0x07}, // SE-R0473 チャンネル↓
@@ -83,11 +84,12 @@ ISR(PCINT0_vect)
     sei(); // Multiple Interrupt Enable except Pin Change Interrupt
     sbi(PORTB, LED);
     // readIR();
-    if(!readIR()) {
-        // _delay_ms(250);
-        for (char i = 0; i < 55; i++) {
-            delay4500us();
-        }
+    unsigned char result = readIR();
+    // _delay_ms(150);
+    for(char i = 0; i < 33; i++) {
+        delay4500us();
+    }
+    if(!result) {
         for(char i = 0; i < NUM_CODES; i++) {
             for(char j = 0; j < 4; j++) {
                 if(code_vol[j] != pgm_read_byte(&(ir_recieve[i][j]))) {
