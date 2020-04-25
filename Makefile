@@ -7,8 +7,8 @@ ELF = $(PROG).elf
 HEX = $(PROG).hex
 
 CC = avr-gcc
-CFLAGS = -g -Os -std=c99 -mmcu=$(MCU) -DF_CPU=$(F_CPU)
-LDFLAGS = -g -Os -mmcu=$(MCU)
+CFLAGS = -g -O1 -std=c99 -mmcu=$(MCU) -DF_CPU=$(F_CPU)
+LDFLAGS = -g -O1 -mmcu=$(MCU)
 OBJCOPY = avr-objcopy
 SIZE = avr-size
 
@@ -19,7 +19,7 @@ $(HEX): $(ELF)
 	$(SIZE) --mcu=$(MCU) --format=avr $(ELF)
 
 $(ELF): $(OBJS)
-	$(CC) $(CFLAGS) -o $(ELF)    $^
+	$(CC) $(CFLAGS) -o $(ELF)   BasicSerial3.S $^
 
 clean:
 	-$(RM) $(ELF) $(HEX) $(OBJS)
