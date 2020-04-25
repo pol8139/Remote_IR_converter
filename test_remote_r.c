@@ -22,7 +22,8 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/pgmspace.h> 
+#include <avr/pgmspace.h>
+#include <avr/sleep.h>
 // #include "BasicSerial3.h"
 // #include "xitoa.h"
 
@@ -63,6 +64,7 @@ volatile unsigned char code_vol[4] = {};
 
 void initTimer(void);
 void initIRIn(void);
+void disableUnusedFunctions(void);
 unsigned char my26Micros(void);
 void delay26nMicros(unsigned char);
 void delay4500us(void);
@@ -118,6 +120,15 @@ void initIRIn(void)
 {
     GIMSK = _BV(PCIE); // Pin Change Interrupt Enable
     PCMSK = _BV(PCINT0); // Pin 0 Change Enable
+}
+
+void disableUnusedFunctions(void)
+{
+    // ADC is disabled by default
+    ACSR |= _BV(ACD); // Analog Comparator Disable
+    MCUSR &= ~_BV(WDRF);
+    WDTCR |= _BV(WDCE) | _BV(WDE);
+    WDTCR = 0x00; // WDT Disable
 }
 
 // void send(char c)
@@ -219,14 +230,17 @@ void sendIR(const unsigned char *data)
 
 int main(void)
 {
-    DDRB = _BV(LED) | _BV(IROUT);
+    DDRB = _BV(LED) | _BV(IROUT) | _BV(DDB4) | _BV(DDB2);
     initTimer();
     initIRIn();
+    disableUnusedFunctions();
     // xdev_out(send);
     disablePWM();
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
     sei();
     while(1) {
         // readIR();
-        ;
+        sleep_bod_disable();
+        sleep_mode();
     }
 }
