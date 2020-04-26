@@ -1,5 +1,5 @@
-PROG = test_remote_r
-OBJS = ${PROG}.o
+PROG = main
+OBJS = ${PROG}.o ir.o mydelay.o
 MCU = attiny13a
 F_CPU = 9600000UL
 

@@ -1,27 +1,7 @@
-//                  +-\/-+
-//    (reset) PB5  1|    |8  Vcc
-//  LED debug PB3  2|    |7  PB2
-// UART 38400 PB4  3|    |6  PB1 (OCB1)  IR out
-//            GND  4|    |5  PB0 (PCINT0)IR in
-//                  +----+
+#include "ir.h"
+#include "mydelay.h"
 
-#ifndef __AVR_ATtiny13A__
-#define __AVR_ATtiny13A__
-#endif // not needed when compile but needed when auto-complete of VSCode
-
-#define IRIN 0
-#define IROUT 1
-#define LED 3
-
-#define NUM_CODES 12
-
-#define sbi(PORT, BIT) PORT |= _BV(BIT)
-#define cbi(PORT, BIT) PORT &= ~_BV(BIT)
-
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <avr/pgmspace.h>
-#include <avr/sleep.h>
+volatile unsigned char code_vol[4] = {};
 
 PROGMEM const unsigned char ir_recieve[NUM_CODES][4] = 
 {
@@ -55,27 +35,6 @@ PROGMEM const unsigned char ir_send[NUM_CODES][4] =
     {0x4B, 0xB6, 0xC0, 0x3F}, // RC-934R VOL -
 };
 
-volatile unsigned char time_26micros = 0;
-volatile unsigned char code_vol[4] = {};
-
-void initTimer(void);
-void initIRIn(void);
-void disableUnusedFunctions(void);
-unsigned char my26Micros(void);
-void delay26nMicros(unsigned char);
-void delay4500us(void);
-unsigned char readIR(void);
-void enablePWM(void);
-void disablePWM(void);
-void sendLeader(void);
-void sendIR1Bit(unsigned char);
-void sendIR(const unsigned char *);
-
-ISR(TIM0_OVF_vect) // Interrupts every 26.3us(38kHz)
-{
-    time_26micros++;
-}
-
 ISR(PCINT0_vect)
 {
     cbi(PCMSK, PCINT0);
@@ -85,7 +44,7 @@ ISR(PCINT0_vect)
     unsigned char result = readIR();
     // _delay_ms(150);
     for(char i = 0; i < 33; i++) {
-        delay4500us();
+        delay4500Micros();
     }
     if(!result) {
         for(char i = 0; i < NUM_CODES; i++) {
@@ -118,30 +77,6 @@ void initIRIn(void)
     PCMSK = _BV(PCINT0); // Pin 0 Change Enable
 }
 
-void disableUnusedFunctions(void)
-{
-    // ADC is disabled by default
-    ACSR |= _BV(ACD); // Analog Comparator Disable
-    MCUSR &= ~_BV(WDRF);
-    WDTCR |= _BV(WDCE) | _BV(WDE);
-    WDTCR = 0x00; // WDT Disable
-}
-
-unsigned char my26Micros(void)
-{
-    return time_26micros;
-}
-
-void delay26nMicros(unsigned char duration)
-{
-    unsigned char time = my26Micros();
-    while((unsigned char)(my26Micros() - time) < duration);
-}
-
-void delay4500us(void)
-{
-    delay26nMicros(173);
-}
 
 unsigned char readIR(void)
 {
@@ -183,10 +118,10 @@ void disablePWM(void)
 void sendLeader(void)
 {
     enablePWM();
-    delay4500us();
-    delay4500us();
+    delay4500Micros();
+    delay4500Micros();
     disablePWM();
-    delay4500us();
+    delay4500Micros();
 }
 
 void sendIR1Bit(unsigned char data)
@@ -214,20 +149,4 @@ void sendIR(const unsigned char *data)
         }
     }
     sendIR1Bit(0); // stop bit
-}
-
-int main(void)
-{
-    DDRB = _BV(LED) | _BV(IROUT) | _BV(DDB4) | _BV(DDB2);
-    initTimer();
-    initIRIn();
-    disableUnusedFunctions();
-    // xdev_out(send);
-    disablePWM();
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-    sei();
-    while(1) {
-        sleep_bod_disable();
-        sleep_mode();
-    }
 }
