@@ -15,8 +15,6 @@
 
 #define NUM_CODES 12
 
-// #define F_CPU 9600000UL
-
 #define sbi(PORT, BIT) PORT |= _BV(BIT)
 #define cbi(PORT, BIT) PORT &= ~_BV(BIT)
 
@@ -24,8 +22,6 @@
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #include <avr/sleep.h>
-// #include "BasicSerial3.h"
-// #include "xitoa.h"
 
 PROGMEM const unsigned char ir_recieve[NUM_CODES][4] = 
 {
@@ -131,11 +127,6 @@ void disableUnusedFunctions(void)
     WDTCR = 0x00; // WDT Disable
 }
 
-// void send(char c)
-// {
-//     TxByte(c);
-// }
-
 unsigned char my26Micros(void)
 {
     return time_26micros;
@@ -154,9 +145,7 @@ void delay4500us(void)
 
 unsigned char readIR(void)
 {
-    //loop_until_bit_is_set(PINB, IRIN); // Wait until the code starts -- the output of IR receiver rodules is active low
-    //loop_until_bit_is_clear(PINB, IRIN);
-    loop_until_bit_is_set(PINB, IRIN);
+    loop_until_bit_is_set(PINB, IRIN); // Note that the output of IR receiver rodules is active low
     unsigned char time = my26Micros();
     loop_until_bit_is_clear(PINB, IRIN);
     time = my26Micros() - time;
@@ -170,7 +159,6 @@ unsigned char readIR(void)
             time = my26Micros();
             loop_until_bit_is_clear(PINB, IRIN);
             time = my26Micros() - time;
-            // if(time > 40) {
             if(56 < time && time < 72) { // "1" is around 3T(1686us)
                 code_vol[i] |= _BV(j);
             } else if(time < 12 || 30 < time) { // "0" should be around 1T(562us)
@@ -239,7 +227,6 @@ int main(void)
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
     sei();
     while(1) {
-        // readIR();
         sleep_bod_disable();
         sleep_mode();
     }
